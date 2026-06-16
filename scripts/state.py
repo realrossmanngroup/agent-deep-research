@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "google-genai>=1.0.0",
+#     "google-genai>=2.0.0",
 #     "rich>=13.0.0",
 # ]
 # ///

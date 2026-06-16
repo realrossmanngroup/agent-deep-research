@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "google-genai>=1.0.0",
+#     "google-genai>=2.0.0",
 #     "rich>=13.0.0",
 #     "markdown>=3.5",
 # ]
@@ -251,6 +251,24 @@ def _file_hash(filepath: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _interaction_text_outputs(interaction: object) -> list[object]:
+    """Return text-like interaction outputs across SDK response shapes."""
+    outputs = getattr(interaction, "outputs", None)
+    if outputs:
+        return list(outputs)
+
+    steps = getattr(interaction, "steps", None) or []
+    text_items: list[object] = []
+    for step in steps:
+        step_type = str(getattr(step, "type", "") or "")
+        if step_type == "user_input":
+            continue
+        for content in getattr(step, "content", None) or []:
+            if getattr(content, "text", None):
+                text_items.append(content)
+    return text_items
 
 
 # Sensitive file patterns that should NEVER be uploaded to remote APIs
@@ -587,8 +605,9 @@ def _write_output_dir(
     # Build interaction data
     outputs_data = []
     sources: list[str] = []
-    if interaction.outputs:
-        for i, output in enumerate(interaction.outputs):
+    outputs = _interaction_text_outputs(interaction)
+    if outputs:
+        for i, output in enumerate(outputs):
             text = getattr(output, "text", None)
             entry: dict = {"index": i, "text": text}
             outputs_data.append(entry)
@@ -797,6 +816,8 @@ def _md_to_html(report_text: str) -> str:
 
 def _convert_report(report_text: str, fmt: str, output_path: str) -> None:
     """Write *report_text* to *output_path* in the requested format."""
+    # Ensure parent directory exists (the engine may have cleaned it during a cycle reset)
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     if fmt == "md":
         Path(output_path).write_text(report_text)
     elif fmt == "html":
@@ -1360,11 +1381,12 @@ def _poll_and_save(
 
             status = interaction.status
 
-            if show_thoughts and interaction.outputs:
-                current_count = len(interaction.outputs)
+            outputs = _interaction_text_outputs(interaction)
+            if show_thoughts and outputs:
+                current_count = len(outputs)
                 if current_count > prev_output_count:
                     # Show new thinking steps
-                    for output in interaction.outputs[prev_output_count:]:
+                    for output in outputs[prev_output_count:]:
                         text = getattr(output, "text", None)
                         if text:
                             live.update(
@@ -1406,8 +1428,9 @@ def _poll_and_save(
 
     # Extract final report
     report_text = ""
-    if interaction.outputs:
-        for output in reversed(interaction.outputs):
+    outputs = _interaction_text_outputs(interaction)
+    if outputs:
+        for output in reversed(outputs):
             text = getattr(output, "text", None)
             if text:
                 report_text = text
@@ -1480,7 +1503,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     console.print(f"ID: {interaction_id}")
 
     # Show outputs summary
-    outputs = interaction.outputs or []
+    outputs = _interaction_text_outputs(interaction)
     if outputs:
         console.print(f"Outputs: {len(outputs)} step(s)")
         console.print()
@@ -1521,7 +1544,7 @@ def cmd_report(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    outputs = interaction.outputs or []
+    outputs = _interaction_text_outputs(interaction)
     if not outputs:
         console.print("[red]Error:[/red] No outputs found for this interaction.")
         sys.exit(1)
