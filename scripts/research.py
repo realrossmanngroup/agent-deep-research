@@ -1004,9 +1004,10 @@ def cmd_start(args: argparse.Namespace) -> None:
         console.print(f"Loading previous research [bold]{args.follow_up}[/bold] for context...")
         try:
             prev = client.interactions.get(args.follow_up)
-            if prev.outputs:
+            prev_outputs = _interaction_text_outputs(prev)
+            if prev_outputs:
                 prev_text = ""
-                for output in prev.outputs:
+                for output in prev_outputs:
                     text = getattr(output, "text", None)
                     if text:
                         prev_text = text  # use the last text output
