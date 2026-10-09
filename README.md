@@ -81,7 +81,7 @@ Optional model configuration:
 |----------|-------------|---------|
 | `GEMINI_DEEP_RESEARCH_MODEL` | Model for file search queries | `gemini-3.1-pro-preview` |
 | `GEMINI_MODEL` | Fallback model name | `gemini-3.1-pro-preview` |
-| `GEMINI_DEEP_RESEARCH_AGENT` | Deep research agent identifier | `deep-research-pro-preview-12-2025` |
+| `GEMINI_DEEP_RESEARCH_AGENT` | Deep research agent identifier (`start --agent` takes precedence) | `deep-research-preview-04-2026` |
 
 ## Quick Start
 
@@ -103,6 +103,18 @@ uv run scripts/research.py start "How does auth work?" --context ./src --output 
 # Filter context to specific file types
 uv run scripts/research.py start "Analyze the Python code" --context ./src --context-extensions py,md
 ```
+
+The research runner pins `google-genai==2.29.0`. Choose the current maximum-comprehensiveness agent explicitly with `start --agent deep-research-max-preview-04-2026`; ordinary File Search query-model settings do not affect this selection. The December 2025 agent is deprecated for shutdown on October 23, 2026. [Google's Deep Research guide](https://ai.google.dev/gemini-api/docs/deep-research) describes the current agents and estimated costs.
+
+Use `uv run scripts/research.py --capabilities` for a local, no-cost compatibility check. Add `--metadata-output receipt.json` to `start` or `report` to preserve a terminal receipt plus `receipt.json.response.json`, a separately hashed SDK serialization. The receipt binds canonical Markdown bytes to the interaction and keeps requested settings separate from the returned agent, provider usage and citation annotations. Unknown returned identity remains null. Provider aggregate usage is not a complete invoice: `billing_complete` is false and `cost_usd` is null; keep any external budget reservation until complete accounting is available.
+
+Fresh, cached and retrieved results use identical final report text. Public progress summaries are displayed separately; empty or thought-only completions fail. Requested File Search grounding is never silently removed after an API error. The local cache separates agents, request policies and local content changes; mutable remote stores and follow-ups do not receive an unsupported content-identity guarantee.
+
+`start --cache-check` accepts the same prompt, agent and formatting arguments as a real start. It makes no API call or state change and returns `cache_hit`, `cache_miss`, `in_progress` (known interaction ID), or `unresolved` (creation acceptance is uncertain). A later start resumes a known pending interaction. `--no-cache` bypasses a completed result for a deliberate quality retry; it cannot create another job while the same request is pending or unresolved. Each new create claims its request under the state lock, then releases the lock before calling the API. The pinned SDK's automatic Interactions POST retries are disabled to avoid replay after uncertain acceptance.
+
+With `--metadata-output receipt.json`, `receipt.json.invocation.json` is written **before** create with `creation_performed: null`, then updated to true only after an accepted interaction ID or false for a known rejection/no-create path. A terminal receipt also records whether this invocation created the job. Fetch-only recovery is free of a new create; it does not assert the original job was free.
+
+Inspect unresolved claims locally with `uv run scripts/research.py --request-status`. Claims never expire into an automatic second create. After checking provider records, an operator can attach an actual interaction ID with `reconcile KEY --expected-claim TOKEN --attach-id ID --reason "recovered provider ID"`, or clear an unresolved claim with `--clear` after establishing that retry is appropriate. Both actions require the exact current claim token and append a reconciliation audit record. No API call is made by inspection or reconciliation. Generic mutable stores/follow-ups retain report-by-ID recovery rather than this automatic identity guarantee.
 
 ## Use Cases
 

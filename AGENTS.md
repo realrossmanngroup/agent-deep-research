@@ -243,7 +243,7 @@ Common errors:
 
 ## Pricing Reference
 
-These are heuristic estimates (Gemini API does not return token counts):
+These are heuristic estimates, not billing limits. The Interactions API now returns aggregate token/tool usage; receipts preserve it, but it does not establish the complete underlying-model/tool bill. `billing_complete` remains false and `cost_usd` remains null. Keep external spending reservations for unknown liability.
 
 | Component | Rate | Notes |
 |-----------|------|-------|
@@ -254,3 +254,19 @@ These are heuristic estimates (Gemini API does not return token counts):
 | Context upload | $0.01-0.05 | Depends on file count/size |
 
 Use `--dry-run` for per-query estimates.
+
+## Current research and evidence contract
+
+The runner pins google-genai 2.29.0 and defaults to `deep-research-preview-04-2026`. Use `start --agent deep-research-max-preview-04-2026` when maximum comprehensiveness is needed; explicit CLI selection overrides `GEMINI_DEEP_RESEARCH_AGENT`. The store-query model setting does not select a Deep Research agent. Provider estimates for Max are about $3–$7 per task, not enforced ceilings; see https://ai.google.dev/gemini-api/docs/deep-research.
+
+`uv run scripts/research.py --capabilities` reports local compatibility without credentials or API calls. `start` and `report` accept `--metadata-output PATH`; a successful terminal receipt binds the interaction ID, canonical report SHA256, requested and returned agent/configuration, SDK version, citation annotations and provider usage. `PATH.response.json` is the separately hashed SDK serialization, not verbatim HTTP bytes. No credential is included. Recovered historical work retains its actual returned identity or null, never today's default.
+
+Blocking, cached and report retrieval emit the same final model-output Markdown. Public progress summaries stay out of final reports. Empty or thought-only completion fails and is not success-cached. File Search errors never retry without requested grounding. Generic context that a remote job may still need survives a timeout; `contextInteractions` records its interaction/store association for later cleanup.
+
+The cache includes the selected agent, request policy, prompt and local file/context content. Mutable remote stores and follow-up research do not claim content-addressed reuse. State ID/history/cache mutations are serialized with a lock and atomic replacement, retaining unrelated data.
+
+Use `start --cache-check` with the same prompt/agent/report-format arguments before any external spending reservation. This read-only command returns `cache_hit|cache_miss|in_progress|unresolved`, `id`, `agent`, `cache_key`, `cacheable` and `reason`. Fetch a hit or pending ID without creating again. An unresolved response requires diagnosis; it is not proof of zero spend. `--no-cache` bypasses completed research only. New creates use a locked request claim; retries resume its accepted ID, and ambiguous no-ID outcomes never silently expire or create again.
+
+`--metadata-output PATH` also creates `PATH.invocation.json` before create. Its `creation_performed` is null while acceptance is unknown, true for an accepted new ID, or false for a proven no-create invocation. Terminal receipts carry the same field; resumed jobs have `origin=report` and false for the present invocation. Do not release a budget reservation on null or solely because no ID was printed.
+
+`--request-status` reports active/unresolved keys, claim tokens and age without credentials or API calls. Operator `reconcile KEY --expected-claim TOKEN --clear --reason TEXT` or `--attach-id ID` is explicit, logged and guarded against a changed claim. Never reconcile automatically based on age. The pinned SDK adapter's internal retry configuration is disabled because its 2.29 translation otherwise replays an ambiguous POST despite the public no-retry option; real mock-transport tests guard this behavior on upgrade.
