@@ -51,5 +51,8 @@
 - All scripts are PEP 723 standalone (inline metadata, run via `uv run`)
 - Dual output convention: stderr = Rich human-readable, stdout = machine-readable JSON
 - State file `.gemini-research.json` is local, contains no credentials
-- The deep research agent identifier `deep-research-pro-preview-12-2025` is the Interactions API agent name, not a model name
+- The default Deep Research agent is `deep-research-preview-04-2026`; `--agent deep-research-max-preview-04-2026` selects the current maximum-comprehensiveness agent. Agent identifiers are not ordinary Gemini model names. The retired December agent is retained only as historical provenance when retrieving an old interaction.
+- `scripts/research.py` and its contract fixtures pin `google-genai==2.29.0`. Run `uv run tests/test_interactions_contract.py` in addition to the release checklist; its provider is fake and network calls are forbidden.
+- `--metadata-output` produces a terminal receipt and a separately hashed SDK serialization. Returned agent/configuration and provider usage must remain distinct from requested settings; missing information remains unknown. Aggregate usage is not a complete bill (`billing_complete=false`).
+- `start --cache-check` and `--request-status` are read-only/no-network. Request claims and invocation records prevent automatic duplicate creates after ambiguous acceptance. Do not expire unknown claims or reinterpret null `creation_performed` as false. Explicit `reconcile` requires a matching claim token and logs the operator's reason.
 - The default query model in store.py is `gemini-3.1-pro-preview`
